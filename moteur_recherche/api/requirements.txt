@@ -1,0 +1,4 @@
+elasticsearch==8.2.0
+fastapi
+uvicorn
+nltk
