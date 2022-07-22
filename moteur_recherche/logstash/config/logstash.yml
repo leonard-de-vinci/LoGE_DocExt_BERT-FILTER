@@ -1,0 +1,8 @@
+# pipeline.ecs_compatibility: disabled
+# xpack.monitoring.elasticsearch.ssl.verification_mode: none
+
+xpack.monitoring.enabled: true
+xpack.monitoring.elasticsearch.username: logstash_system
+xpack.monitoring.elasticsearch.password: ${LOGSTASH_PASSWORD}
+xpack.monitoring.elasticsearch.hosts: [ 'https://es1:9200' ]
+xpack.monitoring.elasticsearch.ssl.certificate_authority: config/certs/ca/ca.crt

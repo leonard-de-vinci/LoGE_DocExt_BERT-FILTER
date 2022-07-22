@@ -1,0 +1,7 @@
+Windows PowerShell (s'assurer que le fichier jq.exe est dans le même dossier) :
+
+type NfCorpusDocs.json | .\jq -c '.[]' > NfCorpusDocs_formatted.json
+
+type AntiqueDocs.json | .\jq -c '.[]' > AntiqueDocs_formatted.json
+
+Vérifier ensuite l'encoding (doit être en UTF-8)
