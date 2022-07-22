@@ -1,0 +1,5 @@
+elasticsearch==8.2.0
+nltk
+sklearn
+transformers
+gensim
