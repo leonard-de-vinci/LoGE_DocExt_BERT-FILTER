@@ -1,0 +1,358 @@
+version: "2.2"
+services:
+  setup:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    container_name: certificates
+    volumes:
+      - certs:/usr/share/elasticsearch/config/certs
+    user: "0"
+    command: >
+      bash -c '
+        if [ x${ELASTIC_PASSWORD} == x ]; then
+          echo "Set the ELASTIC_PASSWORD environment variable in the .env file";
+          exit 1;
+        elif [ x${KIBANA_PASSWORD} == x ]; then
+          echo "Set the KIBANA_PASSWORD environment variable in the .env file";
+          exit 1;
+        elif [ x${LOGSTASH_PASSWORD} == x ]; then
+          echo "Set the LOGSTASH_PASSWORD environment variable in the .env file";
+          exit 1;
+        fi;
+        if [ ! -f config/certs/ca.zip ]; then
+          echo "Creating CA";
+          bin/elasticsearch-certutil ca --silent --pem -out config/certs/ca.zip;
+          unzip config/certs/ca.zip -d config/certs;
+        fi;
+        if [ ! -f config/certs/certs.zip ]; then
+          echo "Creating certs";
+          echo -ne \
+          "instances:\n"\
+          "  - name: es1\n"\
+          "    dns:\n"\
+          "      - es1\n"\
+          "      - localhost\n"\
+          "    ip:\n"\
+          "      - 127.0.0.1\n"\
+          "  - name: es2\n"\
+          "    dns:\n"\
+          "      - es2\n"\
+          "      - localhost\n"\
+          "    ip:\n"\
+          "      - 127.0.0.1\n"\
+          "  - name: es3\n"\
+          "    dns:\n"\
+          "      - es3\n"\
+          "      - localhost\n"\
+          "    ip:\n"\
+          "      - 127.0.0.1\n"\
+          > config/certs/instances.yml;
+          bin/elasticsearch-certutil cert --silent --pem -out config/certs/certs.zip --in config/certs/instances.yml --ca-cert config/certs/ca/ca.crt --ca-key config/certs/ca/ca.key;
+          unzip config/certs/certs.zip -d config/certs;
+        fi;
+        echo "Setting file permissions"
+        chown -R root:root config/certs;
+        find . -type d -exec chmod 750 \{\} \;;
+        find . -type f -exec chmod 640 \{\} \;;
+        echo "Waiting for Elasticsearch availability";
+        until curl -s --cacert config/certs/ca/ca.crt https://es1:9200 | grep -q "missing authentication credentials"; do sleep 30; done;
+        
+        echo "Setting kibana_system password";
+        until curl -s -X POST --cacert config/certs/ca/ca.crt -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" https://es1:9200/_security/user/kibana_system/_password -d "{\"password\":\"${KIBANA_PASSWORD}\"}" | grep -q "^{}"; do sleep 10; done;
+        
+        echo "Setting logstash_system password";
+        until curl -s -X POST --cacert config/certs/ca/ca.crt -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" https://es1:9200/_security/user/logstash_system/_password -d "{\"password\":\"${LOGSTASH_PASSWORD}\"}" | grep -q "^{}"; do sleep 10; done;
+        echo "Creating logstash_writer role";
+        curl -s -X POST --cacert config/certs/ca/ca.crt -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" https://es1:9200/_security/role/logstash_writer -d "{\"cluster\":[\"manage_index_templates\", \"monitor\"],\"indices\":[{\"names\":[\"antique\",\"nfcorpus\"], \"privileges\":[\"write\",\"create\",\"create_index\"]}]}";
+        echo "Creating logstash_internal user";
+        curl -s -X POST --cacert config/certs/ca/ca.crt -u elastic:${ELASTIC_PASSWORD} -H "Content-Type: application/json" https://es1:9200/_security/user/logstash_internal -d "{\"password\":\"${LOGSTASH_PASSWORD}\",\"roles\" :[\"logstash_writer\"]}";
+        echo "All done!";
+      '
+    healthcheck:
+      test: ["CMD-SHELL", "[ -f config/certs/es1/es1.crt ]"]
+      interval: 1s
+      timeout: 5s
+      retries: 120
+    networks:
+      - elk
+
+
+  es1:
+    depends_on:
+      setup:
+        condition: service_healthy
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    container_name: es1
+    volumes:
+      - certs:/usr/share/elasticsearch/config/certs
+      - data1:/usr/share/elasticsearch/data
+    ports:
+      - ${ES_PORT}:9200
+    environment:
+      - node.name=es1
+      - cluster.name=${CLUSTER_NAME}
+      - cluster.initial_master_nodes=es1,es2,es3
+      - discovery.seed_hosts=es2,es3
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=true
+      - xpack.security.http.ssl.key=certs/es1/es1.key
+      - xpack.security.http.ssl.certificate=certs/es1/es1.crt
+      - xpack.security.http.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.http.ssl.verification_mode=certificate
+      - xpack.security.transport.ssl.enabled=true
+      - xpack.security.transport.ssl.key=certs/es1/es1.key
+      - xpack.security.transport.ssl.certificate=certs/es1/es1.crt
+      - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.transport.ssl.verification_mode=certificate
+      - xpack.license.self_generated.type=${LICENSE}
+    mem_limit: ${MEM_LIMIT}
+    networks:
+      - elk
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s --cacert config/certs/ca/ca.crt https://localhost:9200 | grep -q 'missing authentication credentials'",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 120
+
+
+  es2:
+    depends_on:
+      - es1
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    container_name: es2
+    volumes:
+      - certs:/usr/share/elasticsearch/config/certs
+      - data2:/usr/share/elasticsearch/data
+    environment:
+      - node.name=es2
+      - cluster.name=${CLUSTER_NAME}
+      - cluster.initial_master_nodes=es1,es2,es3
+      - discovery.seed_hosts=es1,es3
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=true
+      - xpack.security.http.ssl.key=certs/es2/es2.key
+      - xpack.security.http.ssl.certificate=certs/es2/es2.crt
+      - xpack.security.http.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.http.ssl.verification_mode=certificate
+      - xpack.security.transport.ssl.enabled=true
+      - xpack.security.transport.ssl.key=certs/es2/es2.key
+      - xpack.security.transport.ssl.certificate=certs/es2/es2.crt
+      - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.transport.ssl.verification_mode=certificate
+      - xpack.license.self_generated.type=${LICENSE}
+    mem_limit: ${MEM_LIMIT}
+    networks:
+      - elk
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s --cacert config/certs/ca/ca.crt https://localhost:9200 | grep -q 'missing authentication credentials'",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 120
+
+
+  es3:
+    depends_on:
+      - es2
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    container_name: es3
+    volumes:
+      - certs:/usr/share/elasticsearch/config/certs
+      - data3:/usr/share/elasticsearch/data
+    environment:
+      - node.name=es3
+      - cluster.name=${CLUSTER_NAME}
+      - cluster.initial_master_nodes=es1,es2,es3
+      - discovery.seed_hosts=es1,es2
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=true
+      - xpack.security.http.ssl.key=certs/es3/es3.key
+      - xpack.security.http.ssl.certificate=certs/es3/es3.crt
+      - xpack.security.http.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.http.ssl.verification_mode=certificate
+      - xpack.security.transport.ssl.enabled=true
+      - xpack.security.transport.ssl.key=certs/es3/es3.key
+      - xpack.security.transport.ssl.certificate=certs/es3/es3.crt
+      - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.transport.ssl.verification_mode=certificate
+      - xpack.license.self_generated.type=${LICENSE}
+    mem_limit: ${MEM_LIMIT}
+    networks:
+      - elk
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s --cacert config/certs/ca/ca.crt https://localhost:9200 | grep -q 'missing authentication credentials'",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 120
+
+
+  kibana:
+    depends_on:
+      es1:
+        condition: service_healthy
+      es2:
+        condition: service_healthy
+      es3:
+        condition: service_healthy
+    image: docker.elastic.co/kibana/kibana:${STACK_VERSION}
+    container_name: kibana
+    volumes:
+      - certs:/usr/share/kibana/config/certs
+      - kibanadata:/usr/share/kibana/data
+    ports:
+      - ${KIBANA_PORT}:5601
+    environment:
+      - SERVERNAME=kibana
+      - ELASTICSEARCH_HOSTS=https://es1:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD}
+      - ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES=config/certs/ca/ca.crt
+    # mem_limit: ${MEM_LIMIT}
+    networks:
+      - elk
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s -I http://localhost:5601 | grep -q 'HTTP/1.1 302 Found'",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 120
+
+
+  logstash:
+    user: "0"
+    command: bash -c 'chown -R logstash /usr/share/logstash/config/certs/;su - logstash -c "export LOGSTASH_PASSWORD=${LOGSTASH_PASSWORD} ; bin/logstash -f /usr/share/logstash/pipeline/logstash.conf"'
+    depends_on:
+      es1:
+        condition: service_healthy
+      es2:
+        condition: service_healthy
+      es3:
+        condition: service_healthy
+    image: docker.elastic.co/logstash/logstash:${STACK_VERSION}
+    container_name: logstash
+    volumes:
+      - certs:/usr/share/logstash/config/certs
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./logstash/data/antique_data:/usr/share/data/antique_data:ro
+      - ./logstash/data/nfcorpus_data:/usr/share/data/nfcorpus_data:ro
+      
+
+    ports:
+      - ${LOGSTASH_PORT}:9600
+    environment:
+      ELASTICSEARCH_HOSTS: '["http://es1:9200","http://es2:9200","http://es3:9200"]'
+      #ELASTICSEARCH_URL: http://es1:9200
+      LS_JAVA_OPTS: -Xmx256m -Xms256m
+    mem_limit: ${MEM_LIMIT}
+    networks:
+      - elk
+
+
+  trigger_tokens:
+    container_name: trigger_tokens
+    depends_on:
+      es1:
+        condition: service_healthy
+      es2:
+        condition: service_healthy
+      es3:
+        condition: service_healthy
+    build: ./trigger/trigger_tokens
+    command: python trigger_tokens.py
+    volumes:
+      - certs:/usr/src/app/certs
+    # mem_limit: ${MEM_LIMIT}
+    networks:
+      - elk
+    env_file:
+      - .env
+
+  trigger_filters:
+    container_name: trigger_filters
+    depends_on:
+      es1:
+        condition: service_healthy
+      es2:
+        condition: service_healthy
+      es3:
+        condition: service_healthy
+    build: ./trigger/trigger_filters
+    command: python trigger_filters.py
+    volumes:
+      - certs:/usr/src/app/certs
+    # mem_limit: ${MEM_LIMIT}
+    networks:
+      - elk
+    env_file:
+      - .env
+
+
+  api:
+    container_name: api
+    depends_on:
+      es1:
+        condition: service_healthy
+      es2:
+        condition: service_healthy
+      es3:
+        condition: service_healthy
+    build: ./api
+    command: uvicorn main:app --host 0.0.0.0
+    ports:
+      - 8000:8000
+    volumes:
+      - certs:/usr/src/app/certs
+    # mem_limit: ${MEM_LIMIT}
+    networks:
+      - elk
+    env_file:
+      - .env
+
+
+  
+volumes:
+  certs:
+    driver: local
+  data1:
+    driver: local
+  data2:
+    driver: local
+  data3:
+    driver: local
+  kibanadata:
+    driver: local
+
+
+networks:
+  elk:
+    driver: bridge
