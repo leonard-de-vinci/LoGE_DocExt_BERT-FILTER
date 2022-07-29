@@ -2,4 +2,5 @@ elasticsearch==8.2.0
 nltk
 sklearn
 transformers
-gensim
+gensim==3.8.0
+wikipedia2vec

@@ -1,10 +1,6 @@
 # -*- coding: utf-8 -*-
-from gensim.models import KeyedVectors
-import sklearn.metrics.pairwise as ps
-from sklearn.decomposition import PCA
+
 import numpy as np
-from collections import Counter
-from math import log
 import re
 import string
 import nltk
@@ -17,6 +13,10 @@ from elasticsearch import Elasticsearch
 from time import sleep
 from datetime import datetime,timezone
 
+from gensim.models import KeyedVectors
+import sklearn.metrics.pairwise as ps
+from sklearn.decomposition import PCA
+from wikipedia2vec import Wikipedia2Vec
 
 # --------------------------------------------------------------------------------------------------------------
 # ------------------------------------------- Connexion au cluster ES ------------------------------------------
@@ -461,6 +461,16 @@ def updateDocuments(index):
                   "process_status.filters.status": "score"
                 }
               }
+            #   ,{
+            #     "match_phrase": {
+            #       "process_status.filters.status": "pca_axes"
+            #     }
+            #   },
+            #   {
+            #     "match_phrase": {
+            #       "process_status.filters.status": "pca_centroid"
+            #     }
+            #   }
             ]
           }
         }
@@ -508,10 +518,10 @@ def updateDocuments(index):
                         # PCA_centroid_filter=getACPCentroidFilteredExtension(doc, 2, 50, True)
                         # PCA_axes_filter=getACPAxisFilteredExtension(doc, 2, 50, True)
                     
+                        # filters={"basic":basic_filter,"score":score_filter,"perfectPredictions":perfectPredictions_filter,"pca_axes":PCA_axes_filter,"pca_centroid":PCA_centroid_filter}
                         filters={"basic":basic_filter,"score":score_filter,"perfectPredictions":perfectPredictions_filter}
-                        # filters={"basic":basic_filter,"score":score_filter,"perfectPredictions":perfectPredictions_filter,"pca_centroid":PCA_centroid_filter,"pca_axes":PCA_axes_filter}
+                        # process_status=" basic score perfectPredictions pca_axes pca_centroid"
                         process_status=" basic score perfectPredictions"
-                        # process_status=" basic score perfectPredictions pca_centroid pca_axes"
                     
                     else:# si le field 'filters' existe déjà dans le document, ça veut dire qu'il lui manque uniquement certains filtres, alors on vérifie 1 par 1 lequel est manquant
                         process_status=hits[i]["_source"]["process_status"]["filters"]["status"]#comme au moins un filtre existe déjà, alors le process_status existe déjà, on le récup pour le mettre à jour
@@ -565,7 +575,22 @@ def updateDocuments(index):
 # ------------------------------------------------------------------------------------------------------
 
 
-# A REMPLACER PAR LES MODELES DEFINITIFS
-# wv_from_bin = KeyedVectors.load_word2vec_format("enwiki_20180420_100d.bin",encoding="utf-8" ,binary=True)# https://wikipedia2vec.github.io/wikipedia2vec/pretrained/ => UnicodeDecodeError: 'utf-8' codec can't decode byte 0x80 in position 0: invalid start byte
-# wv_from_bin = KeyedVectors.load("enwiki_20180420_100d.bin")# https://wikipedia2vec.github.io/wikipedia2vec/pretrained/ => AttributeError: 'dict' object has no attribute 'append'
+### 1ERE SOLUTION 
+
+# Extraire le PKL du BZ2 puis..
+wv_from_bin = Wikipedia2Vec.load("enwiki_20180420_100d.pkl")
+wv_from_bin.save_text("test", out_format='word2vec')
+wv_from_bin = KeyedVectors.load_word2vec_format("test")
+wv_from_bin.save_word2vec_format("enwiki_20180420_100d.bin", binary=True)
+wv_from_bin = KeyedVectors.load_word2vec_format("enwiki_20180420_100d.bin", binary=True)
+
+### 2EME SOLUTION MAIS TU VAS DEVOIR TELECHARGER LA VERSION .txt DU WORD2VEC
+
+# Extraire le TXT du BZ2 puis..
+# wv_from_bin = KeyedVectors.load_word2vec_format("E:/Data/enwiki_20180420_100d.txt")
+# wv_from_bin.save_word2vec_format("enwiki_20180420_100d.bin", binary=True)
+# wv_from_bin = KeyedVectors.load_word2vec_format("enwiki_20180420_100d.bin", binary=True)
+
+
 updateDocuments("antique")
+updateDocuments("nfcorpus")
