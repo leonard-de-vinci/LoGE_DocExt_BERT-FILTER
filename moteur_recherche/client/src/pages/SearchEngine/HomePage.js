@@ -92,6 +92,7 @@ export default function HomePage() {
                       <em>None</em>
                     </MenuItem>
                     <MenuItem value="antique">Antique</MenuItem>
+                    <MenuItem value="antiquebm25">Antique BM25</MenuItem>
                     <MenuItem value="nfcorpus">Nfcorpus</MenuItem>
                   </Select>
                 </FormControl>

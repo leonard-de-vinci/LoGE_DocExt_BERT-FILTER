@@ -108,7 +108,7 @@ export default function Search() {
   useEffect(() => {
     fetchDocuments();
     //eslint-disable-next-line
-  }, [nbResultsPerPage, filters]);
+  }, [nbResultsPerPage, filters,index]);
 
   return (
     <>
@@ -127,10 +127,8 @@ export default function Search() {
                     onChange={handleIndex}
                     label="Index"
                   >
-                    <MenuItem value="">
-                      <em>None</em>
-                    </MenuItem>
                     <MenuItem value="antique">Antique</MenuItem>
+                    <MenuItem value="antiquebm25">Antique BM25</MenuItem>
                     <MenuItem value="nfcorpus">Nfcorpus</MenuItem>
                   </Select>
                 </FormControl>
