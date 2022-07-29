@@ -106,7 +106,8 @@ services:
       - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
       - xpack.security.transport.ssl.verification_mode=certificate
       - xpack.license.self_generated.type=${LICENSE}
-    mem_limit: ${MEM_LIMIT}
+      # - ES_JAVA_OPTS="-Xms2g -Xmx2g"
+    mem_limit: 2g
     networks:
       - elk
     ulimits:
@@ -150,7 +151,8 @@ services:
       - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
       - xpack.security.transport.ssl.verification_mode=certificate
       - xpack.license.self_generated.type=${LICENSE}
-    mem_limit: ${MEM_LIMIT}
+      # - ES_JAVA_OPTS="-Xms2g -Xmx2g"
+    mem_limit: 2g
     networks:
       - elk
     ulimits:
@@ -194,7 +196,8 @@ services:
       - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
       - xpack.security.transport.ssl.verification_mode=certificate
       - xpack.license.self_generated.type=${LICENSE}
-    mem_limit: ${MEM_LIMIT}
+      # - ES_JAVA_OPTS="-Xms2g -Xmx2g"
+    mem_limit: 2g
     networks:
       - elk
     ulimits:
@@ -271,9 +274,8 @@ services:
       - ${LOGSTASH_PORT}:9600
     environment:
       ELASTICSEARCH_HOSTS: '["http://es1:9200","http://es2:9200","http://es3:9200"]'
-      #ELASTICSEARCH_URL: http://es1:9200
       LS_JAVA_OPTS: -Xmx256m -Xms256m
-    mem_limit: ${MEM_LIMIT}
+    # mem_limit: ${MEM_LIMIT}
     networks:
       - elk
 
@@ -307,7 +309,7 @@ services:
       es3:
         condition: service_healthy
     build: ./trigger/trigger_filters
-    command: python trigger_filters.py
+    command: python -u trigger_filters.py
     volumes:
       - certs:/usr/src/app/certs
     # mem_limit: ${MEM_LIMIT}
@@ -337,6 +339,20 @@ services:
       - elk
     env_file:
       - .env
+
+
+  react:
+    container_name: react
+    build: ./client
+    ports:
+      - 3000:3000
+    volumes:
+      - ./client/src:/client/src:ro
+    networks:
+        - elk
+    environment:
+      - WATCHPACK_POLLING=true
+
 
 
   

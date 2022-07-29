@@ -1,0 +1,28 @@
+KIBANA DEV TOOLS : 
+
+
+PUT antiquebm25
+{
+  "settings": {
+    "number_of_shards": 3,
+    "index" : {
+        "similarity" : {
+          "default" : {
+            "type" : "BM25",
+            "b": 0.75,
+            "k1": 1.2
+          }
+        }
+    }
+  }
+}
+
+POST _reindex
+{
+  "source": {
+    "index": "antique"
+  },
+  "dest": {
+    "index": "antiquebm25"
+  }
+}
