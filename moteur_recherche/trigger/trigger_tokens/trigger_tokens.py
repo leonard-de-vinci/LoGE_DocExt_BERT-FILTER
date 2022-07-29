@@ -221,7 +221,7 @@ def updateDocuments(unmaskerBert,index):
 
 # !!!! bertModel : A REMPLACER PAR LES MODELES DEFINITIFS !!!!
 bertModel = pipeline('fill-mask', model='google/bert_uncased_L-4_H-256_A-4')
-# updateDocuments(bertModel,"antique")
+updateDocuments(bertModel,"antique")
 updateDocuments(bertModel,"nfcorpus")
 
 
