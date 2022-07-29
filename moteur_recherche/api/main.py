@@ -56,7 +56,9 @@ elastic = Elasticsearch("https://elastic:"+es_password +"@es1:9200", ca_certs="/
 
 class IndexOptions(str, Enum):
     antique = "antique"
+    antiquebm25="antiquebm25"
     nfcorpus = "nfcorpus"
+    nfcorpusbm25 = "nfcorpusbm25"
 
 
 class FiltersOptions(str, Enum):
@@ -334,7 +336,7 @@ async def getDocs(index: IndexOptions, question: str, filters: list[FiltersOptio
 
 
 @app.get("/search_doc/{index}/{question}/{doc_id}/")
-async def getDoc(index: IndexOptions, question: str, doc_id: int, filters: list[FiltersOptions] = Query(default=[FiltersOptions.abstract])):
+async def getDoc(index: IndexOptions, question: str, doc_id: str, filters: list[FiltersOptions] = Query(default=[FiltersOptions.abstract])):
     query = {
         "match": {
             "_id": doc_id
@@ -423,7 +425,7 @@ async def getDoc(index: IndexOptions, question: str, doc_id: int, filters: list[
 
 
 @app.get("/tokens/{index}/{doc_id}/")
-async def getTokensList(index: IndexOptions, doc_id: int):
+async def getTokensList(index: IndexOptions, doc_id: str):
     query = {
         "match": {
             "_id": doc_id
@@ -469,7 +471,6 @@ async def getTokensList(index: IndexOptions, doc_id: int):
                                 currentWord[filter]="-"
                         wordList.append(currentWord)
                     final_response["tokensList"]=wordList
-                print(final_response)
                 return {"tokens":final_response}
             except Exception as err:
                 print("Erreur dans le code :", err)
