@@ -14,3 +14,7 @@ sysctl -w vm.max_map_count=262144
 exit
 docker-compose up
 ```
+
+## Download Wikipedia2Vec
+
+[Wikipedia2Vec](https://wikipedia2vec.github.io/wikipedia2vec/pretrained/)
