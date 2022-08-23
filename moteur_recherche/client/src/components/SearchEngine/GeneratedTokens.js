@@ -32,7 +32,7 @@ export default function GeneratedTokens(props) {
   if (Object.keys(tokens).length > 0) {
     const columns = [{ field: "word", headerName: "word" }];
 
-    filters.forEach((filter) =>
+    filters.sort().forEach((filter) =>
       columns.push({
         field: filter,
         headerName: `${filter} (${tokens["totalNbTokensPerFilter"][filter]})`,
