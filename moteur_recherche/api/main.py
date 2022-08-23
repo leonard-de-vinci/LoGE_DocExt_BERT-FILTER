@@ -386,7 +386,7 @@ async def getDoc(index: IndexOptions, question: str, doc_id: str, filters: list[
                     for word in set(question_tokens):
                         currentWord_occurrence={"word":word} # correspond à un mot qu'on va ajouter ensuite à occurrenceWordsInFilters une fois terminé => {"word":str , "bertTokens":int ...}
                         currentWord_score={"word":word} # correspond à un mot qu'on va ajouter ensuite à scoreWordsInFilters une fois terminé => {"word":str , "bertTokens":float ...}
-                        for filter in filters: 
+                        for filter in sorted(filters): 
                             if filter in existingFilters: # pour chaque filtre qui existe et est non-nul dans le document Elasticsearch, on va calculer l'occurrence et le score du currentWord
                                  
                                 currentWord_occurrence[filter]=token_str_list_perFilter[filter].count(word)
@@ -397,7 +397,7 @@ async def getDoc(index: IndexOptions, question: str, doc_id: str, filters: list[
                                 currentWord_occurrence[filter]="-"
                                 currentWord_score[filter]="-"
 
-                        occurrenceWordsInFilters.append(currentWord_occurrence)
+                        occurrenceWordsInFilters.append(currentWord_occurrence) 
                         scoreWordsInFilters.append(currentWord_score)
 
                 if occurrenceWordsInFilters!=[] : occurrencesOfQueryWords["filters"] = occurrenceWordsInFilters # si les occurences des mots par filtre sont non nulles, alors on rajoute à la final_response
