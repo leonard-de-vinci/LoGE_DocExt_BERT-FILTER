@@ -22,7 +22,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import CustomAppBar from "../../components/AppBar";
 import Popup from "./Popup";
 
-const filtersList = ["abstract", "bertTokens","basic","score","perfectPredictions"];
+const filtersList = ["abstract", "bertTokens","basic","score","perfectPredictions","pca_axes","pca_centroid"];
 
 export default function Search() {
   let { _index, _query } = useParams();
