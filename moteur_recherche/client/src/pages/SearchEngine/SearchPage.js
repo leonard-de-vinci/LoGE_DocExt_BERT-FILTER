@@ -175,7 +175,7 @@ export default function Search() {
                       </Box>
                     )}
                   >
-                    {filtersList.map((filter) => (
+                    {filtersList.sort().map((filter) => (
                       <MenuItem key={filter} value={filter}>
                         {filter}
                       </MenuItem>
