@@ -419,9 +419,9 @@ async def getDoc(index: IndexOptions, question: str, doc_id: str, filters: list[
     raise HTTPException(status_code=404, detail="Cannot connect to the elastic cluster") # si on n'a pas réussi à retourner la liste de documents, alors on raise une erreur
 
 
-# -------------------------------------------------------------------------------------------------------------------------------------
-# ------------------------------- Endpoint : retourne tous les bertTokens d'un document en particulier  -------------------------------
-# -------------------------------------------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# ------------------------------- Endpoint : retourne tous les tokens du document précisé en paramètre avec l'occurence de chaque token par filtre  -------------------------------
+# ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 @app.get("/tokens/{index}/{doc_id}/")
@@ -438,7 +438,7 @@ async def getTokensList(index: IndexOptions, doc_id: str):
         try:
             response = elastic.search(index=index, query=query, size=1)
             try:
-                hit = response["hits"]["hits"][0] # car un seul résultat
+                hit = response["hits"]["hits"][0] # [0] car un seul résultat, on cherche un document précis
                 final_response = {}
 
                 filters=[filter.value for filter in FiltersOptions]
@@ -450,7 +450,7 @@ async def getTokensList(index: IndexOptions, doc_id: str):
                     token_str_list_perFilter={} # rassemble tous les token_str de chaque filtre => {"bertTokens":["token_str",..,"token_str"] , "score":["token_str",..,"token_str"]}
                     TotalNbTokens_perFilter={}
 
-                    for filter in filters:
+                    for filter in sorted(filters):
                         if filter in existingFilters:
                             token_str_list = [] # correspond a la liste des token_str pour le filtre en question
                             for token in getTokensAndScores(hit,filter): # à partir de la liste des 'token_str' et 'score' retournés par la fonction getTokensAndScores(), on récupère uniquement le token_str de chaque token
@@ -464,7 +464,7 @@ async def getTokensList(index: IndexOptions, doc_id: str):
                     wordList=[]
                     for word in set(token_str_list_perFilter["bertTokens"]):
                         currentWord={"word":word} 
-                        for filter in filters:
+                        for filter in sorted(filters):
                             if filter in existingFilters:
                                 currentWord[filter]=token_str_list_perFilter[filter].count(word)
                             else:
